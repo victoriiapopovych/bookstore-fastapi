@@ -216,3 +216,27 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# IDE
+.idea/
+
+# VS Code
+.vscode/
+
+# Environment files
+.env.*
+!.env.example
+
+# MongoDB
+mongo_data/
+
+# Docker
+docker_data/
+
+# Logs
+logs/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
