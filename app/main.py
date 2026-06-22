@@ -6,6 +6,12 @@ from app.api.health import router as health_router
 from app.core.config import settings
 from app.db.mongodb import close_mongo_connection, connect_to_mongo
 
+from app.api.categories import router as categories_router
+
+from app.core.logging import setup_logging
+
+setup_logging()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -20,6 +26,7 @@ app = FastAPI(
 )
 
 app.include_router(health_router)
+app.include_router(categories_router)
 
 
 @app.get("/")
