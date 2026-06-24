@@ -18,3 +18,7 @@ def get_bundle_collection():
 
 def get_discount_collection():
     return mongodb.database["discounts"]
+
+
+def get_user_collection():
+    return mongodb.database["users"]
