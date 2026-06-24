@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 
 from pydantic import BaseModel, Field
 
@@ -15,6 +15,7 @@ class AuthorUpdate(BaseModel):
     biography: str | None = Field(None, max_length=2000)
     country: str | None = Field(None, max_length=100)
     birth_date: date | None = None
+    is_active: bool | None = None
 
 
 class AuthorResponse(BaseModel):
@@ -24,3 +25,5 @@ class AuthorResponse(BaseModel):
     country: str | None = None
     birth_date: date | None = None
     is_active: bool
+    created_at: datetime
+    updated_at: datetime

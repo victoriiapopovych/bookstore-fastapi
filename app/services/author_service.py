@@ -18,11 +18,19 @@ def serialize_author(author):
         "country": author.get("country"),
         "birth_date": author.get("birth_date"),
         "is_active": author["is_active"],
+        "created_at": author["created_at"],
+        "updated_at": author["updated_at"],
     }
 
 
 async def create_author(author: AuthorCreate):
     author_data = author.model_dump()
+
+    if author_data.get("birth_date"):
+        author_data["birth_date"] = datetime.combine(
+            author_data["birth_date"],
+            datetime.min.time(),
+        )
 
     author_collection = get_author_collection()
 
@@ -77,6 +85,12 @@ async def update_author(author_id: str, author: AuthorUpdate):
         return None
 
     update_data = author.model_dump(exclude_unset=True)
+
+    if update_data.get("birth_date"):
+        update_data["birth_date"] = datetime.combine(
+            update_data["birth_date"],
+            datetime.min.time(),
+        )
 
     if not update_data:
         return await get_author_by_id(author_id)

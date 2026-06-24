@@ -3,6 +3,8 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field, model_validator
 
+from datetime import datetime
+
 
 class ProductType(str, Enum):
     BOOK = "book"
@@ -50,6 +52,7 @@ class ProductUpdate(BaseModel):
     price: Decimal | None = Field(None, gt=0)
     stock_quantity: int | None = Field(None, ge=0)
     category_id: str | None = None
+    book_details: BookDetails | None = None
     is_active: bool | None = None
 
 
@@ -63,3 +66,5 @@ class ProductResponse(BaseModel):
     product_type: ProductType
     book_details: BookDetails | None = None
     is_active: bool
+    created_at: datetime
+    updated_at: datetime

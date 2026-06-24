@@ -9,7 +9,15 @@ router = APIRouter(prefix="/categories", tags=["Categories"])
 
 @router.post("/", response_model=CategoryResponse, status_code=status.HTTP_201_CREATED)
 async def create_category_endpoint(category: CategoryCreate):
-    return await create_category(category)
+    created_category = await create_category(category)
+
+    if not created_category:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid parent_id or slug already exists",
+        )
+
+    return created_category
 
 
 @router.get("/", response_model=list[CategoryResponse])
@@ -37,7 +45,7 @@ async def update_category_endpoint(category_id: str, category: CategoryUpdate):
     if not updated_category:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Category not found",
+            detail="Category not found, invalid parent_id or slug already exists"
         )
 
     return updated_category

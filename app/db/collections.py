@@ -11,3 +11,7 @@ def get_author_collection():
 
 def get_product_collection():
     return mongodb.database["products"]
+
+
+def get_bundle_collection():
+    return mongodb.database["bundles"]
