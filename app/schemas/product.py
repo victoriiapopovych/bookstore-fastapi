@@ -1,9 +1,8 @@
 from enum import Enum
 from decimal import Decimal
+from datetime import datetime
 
 from pydantic import BaseModel, Field, model_validator
-
-from datetime import datetime
 
 
 class ProductType(str, Enum):
@@ -24,6 +23,13 @@ class BookDetails(BaseModel):
     pages: int = Field(..., gt=0)
     publication_year: int = Field(..., ge=0)
     cover_type: CoverType
+
+
+class ActiveDiscountResponse(BaseModel):
+    id: str
+    name: str
+    discount_type: str
+    value: float
 
 
 class ProductCreate(BaseModel):
@@ -65,6 +71,9 @@ class ProductResponse(BaseModel):
     category_id: str
     product_type: ProductType
     book_details: BookDetails | None = None
+    original_price: Decimal
+    final_price: Decimal
+    active_discount: ActiveDiscountResponse | None = None
     is_active: bool
     created_at: datetime
     updated_at: datetime

@@ -1,6 +1,8 @@
 from app.db.collections import get_product_collection, get_category_collection, get_author_collection
 from app.schemas.product import ProductCreate, ProductUpdate, ProductType
 
+from app.services.discount_calculation_service import calculate_product_price
+
 from bson import ObjectId
 from bson.errors import InvalidId
 
@@ -10,12 +12,17 @@ from datetime import datetime, UTC
 logger = logging.getLogger(__name__)
 
 
-def serialize_product(product):
+async def serialize_product(product):
+    price_data = await calculate_product_price(product)
+
     return {
         "id": str(product["_id"]),
         "name": product["name"],
         "description": product["description"],
         "price": product["price"],
+        "original_price": price_data["original_price"],
+        "final_price": price_data["final_price"],
+        "active_discount": price_data["active_discount"],
         "stock_quantity": product["stock_quantity"],
         "category_id": product["category_id"],
         "product_type": product["product_type"],
@@ -100,7 +107,7 @@ async def create_product(product: ProductCreate):
     )
 
     logger.info("Product created: %s", product_data["name"])
-    return serialize_product(created_product)
+    return await serialize_product(created_product)
 
 
 async def get_products():
@@ -108,7 +115,7 @@ async def get_products():
 
     products = await product_collection.find().to_list(length=100)
 
-    return [serialize_product(product) for product in products]
+    return [await serialize_product(product) for product in products]
 
 
 async def get_product_by_id(product_id: str):
@@ -126,7 +133,7 @@ async def get_product_by_id(product_id: str):
     if not product:
         return None
 
-    return serialize_product(product)
+    return await serialize_product(product)
 
 
 async def update_product(product_id: str, product: ProductUpdate):
@@ -184,7 +191,7 @@ async def update_product(product_id: str, product: ProductUpdate):
     )
 
     logger.info("Product updated: %s", product_id)
-    return serialize_product(updated_product)
+    return await serialize_product(updated_product)
 
 
 async def delete_product(product_id: str):
@@ -213,4 +220,4 @@ async def delete_product(product_id: str):
     )
 
     logger.info("Product deactivated: %s", product_id)
-    return serialize_product(deleted_product)
+    return await serialize_product(deleted_product)

@@ -8,11 +8,15 @@ from bson.errors import InvalidId
 from app.db.collections import get_bundle_collection, get_product_collection
 from app.schemas.bundle import BundleCreate, BundleUpdate
 
+from app.services.discount_calculation_service import calculate_bundle_price
+
 
 logger = logging.getLogger(__name__)
 
 
-def serialize_bundle(bundle):
+async def serialize_bundle(bundle):
+    price_data = await calculate_bundle_price(bundle)
+
     return {
         "id": str(bundle["_id"]),
         "name": bundle["name"],
@@ -21,6 +25,8 @@ def serialize_bundle(bundle):
         "discount_percent": bundle["discount_percent"],
         "original_price": bundle["original_price"],
         "final_price": bundle["final_price"],
+        "discounted_price": price_data["final_price"],
+        "active_discount": price_data["active_discount"],
         "is_active": bundle["is_active"],
         "created_at": bundle["created_at"],
         "updated_at": bundle["updated_at"],
@@ -96,7 +102,7 @@ async def create_bundle(bundle: BundleCreate):
     )
 
     logger.info("Bundle created: %s", bundle_data["name"])
-    return serialize_bundle(created_bundle)
+    return await serialize_bundle(created_bundle)
 
 
 async def get_bundles():
@@ -104,7 +110,7 @@ async def get_bundles():
 
     bundles = await bundle_collection.find().to_list(length=100)
 
-    return [serialize_bundle(bundle) for bundle in bundles]
+    return [await serialize_bundle(bundle) for bundle in bundles]
 
 
 async def get_bundle_by_id(bundle_id: str):
@@ -120,7 +126,7 @@ async def get_bundle_by_id(bundle_id: str):
     if not bundle:
         return None
 
-    return serialize_bundle(bundle)
+    return await serialize_bundle(bundle)
 
 
 async def update_bundle(bundle_id: str, bundle: BundleUpdate):
@@ -139,7 +145,7 @@ async def update_bundle(bundle_id: str, bundle: BundleUpdate):
     update_data = bundle.model_dump(exclude_unset=True)
 
     if not update_data:
-        return serialize_bundle(existing_bundle)
+        return await serialize_bundle(existing_bundle)
 
     items = update_data.get("items", existing_bundle["items"])
     discount_percent = update_data.get(
@@ -171,7 +177,7 @@ async def update_bundle(bundle_id: str, bundle: BundleUpdate):
     updated_bundle = await bundle_collection.find_one({"_id": object_id})
 
     logger.info("Bundle updated: %s", bundle_id)
-    return serialize_bundle(updated_bundle)
+    return await serialize_bundle(updated_bundle)
 
 
 async def delete_bundle(bundle_id: str):
@@ -198,4 +204,4 @@ async def delete_bundle(bundle_id: str):
     deleted_bundle = await bundle_collection.find_one({"_id": object_id})
 
     logger.info("Bundle deactivated: %s", bundle_id)
-    return serialize_bundle(deleted_bundle)
+    return await serialize_bundle(deleted_bundle)

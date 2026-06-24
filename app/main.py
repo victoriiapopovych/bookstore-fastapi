@@ -12,6 +12,7 @@ from app.api.categories import router as categories_router
 from app.api.authors import router as authors_router
 from app.api.products import router as products_router
 from app.api.bundles import router as bundles_router
+from app.api.discounts import router as discounts_router
 
 from app.core.logging import setup_logging
 
@@ -35,6 +36,7 @@ app.include_router(categories_router)
 app.include_router(authors_router)
 app.include_router(products_router)
 app.include_router(bundles_router)
+app.include_router(discounts_router)
 
 @app.get("/")
 async def root():
