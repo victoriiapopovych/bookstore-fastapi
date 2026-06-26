@@ -1,140 +1,90 @@
 from fastapi import APIRouter, Depends, status, HTTPException
 
 from app.dependencies.auth import require_manager
-from app.schemas.category import CategoryCreate, CategoryUpdate, CategoryUserResponse, CategoryManagerResponse
-from app.services.category_service import create_category, get_categories, get_active_categories, get_category_by_id, update_category, delete_category
-from app.exceptions.category import CategoryNotFoundError, InvalidCategoryIdError, InvalidParentCategoryError, CategorySlugAlreadyExistsError
-
-router = APIRouter(prefix="/categories", tags=["Categories"])
+from app.schemas.author import AuthorCreate, AuthorUpdate, AuthorUserResponse, AuthorManagerResponse
+from app.services.author_service import create_author, get_authors, get_active_authors, get_author_by_id, update_author, delete_author
 
 
-@router.post("/", response_model=CategoryManagerResponse, status_code=status.HTTP_201_CREATED)
-async def create_category_endpoint(
-    category: CategoryCreate,
+router = APIRouter(prefix="/authors", tags=["Authors"])
+
+
+@router.post("/", response_model=AuthorManagerResponse, status_code=status.HTTP_201_CREATED)
+async def create_author_endpoint(
+    author: AuthorCreate,
     current_user: dict = Depends(require_manager),
 ):
-    try:
-        return await create_category(category)
-
-    except InvalidParentCategoryError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid parent_id",
-        )
-
-    except CategorySlugAlreadyExistsError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Category slug already exists",
-        )
+    return await create_author(author)
 
 
-@router.get("/", response_model=list[CategoryUserResponse])
-async def get_active_categories_endpoint():
-    return await get_active_categories()
+@router.get("/", response_model=list[AuthorUserResponse])
+async def get_active_authors_endpoint():
+    return await get_active_authors()
 
 
-@router.get("/manager", response_model=list[CategoryManagerResponse])
-async def get_categories_manager_endpoint(
+@router.get("/manager", response_model=list[AuthorManagerResponse])
+async def get_authors_manager_endpoint(
     current_user: dict = Depends(require_manager),
 ):
-    return await get_categories()
+    return await get_authors()
 
 
-@router.get("/manager/{category_id}", response_model=CategoryManagerResponse)
-async def get_category_manager_endpoint(
-    category_id: str,
+@router.get("/manager/{author_id}", response_model=AuthorManagerResponse)
+async def get_author_manager_endpoint(
+    author_id: str,
     current_user: dict = Depends(require_manager),
 ):
-    try:
-        return await get_category_by_id(category_id)
+    author = await get_author_by_id(author_id)
 
-    except InvalidCategoryIdError:
+    if not author:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Category not found",
+            detail="Author not found",
         )
 
-    except CategoryNotFoundError:
+    return author
+
+
+@router.get("/{author_id}", response_model=AuthorUserResponse)
+async def get_author_endpoint(author_id: str):
+    author = await get_author_by_id(author_id)
+
+    if not author or not author["is_active"]:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Category not found",
+            detail="Author not found",
         )
 
-
-@router.get("/{category_id}", response_model=CategoryUserResponse)
-async def get_category_endpoint(category_id: str):
-    try:
-        category = await get_category_by_id(category_id)
-
-        if not category["is_active"]:
-            raise CategoryNotFoundError
-
-        return category
-
-    except InvalidCategoryIdError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Category not found",
-        )
-
-    except CategoryNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Category not found",
-        )
+    return author
 
 
-@router.patch("/{category_id}", response_model=CategoryManagerResponse)
-async def update_category_endpoint(
-    category_id: str,
-    category: CategoryUpdate,
+@router.patch("/{author_id}", response_model=AuthorManagerResponse)
+async def update_author_endpoint(
+    author_id: str,
+    author: AuthorUpdate,
     current_user: dict = Depends(require_manager),
 ):
-    try:
-        return await update_category(category_id, category)
+    updated_author = await update_author(author_id, author)
 
-    except InvalidCategoryIdError:
+    if not updated_author:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Category not found",
+            detail="Author not found",
         )
 
-    except CategoryNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Category not found",
-        )
-
-    except InvalidParentCategoryError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid parent_id",
-        )
-
-    except CategorySlugAlreadyExistsError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Category slug already exists",
-        )
+    return updated_author
 
 
-@router.delete("/{category_id}", response_model=CategoryManagerResponse)
-async def delete_category_endpoint(
-    category_id: str,
+@router.delete("/{author_id}", response_model=AuthorManagerResponse)
+async def delete_author_endpoint(
+    author_id: str,
     current_user: dict = Depends(require_manager),
 ):
-    try:
-        return await delete_category(category_id)
+    deleted_author = await delete_author(author_id)
 
-    except InvalidCategoryIdError:
+    if not deleted_author:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Category not found",
+            detail="Author not found",
         )
 
-    except CategoryNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Category not found",
-        )
+    return deleted_author

@@ -1,56 +1,92 @@
-from fastapi import APIRouter, status, HTTPException
+from fastapi import APIRouter, Depends, status, HTTPException
 
-from app.schemas.author import AuthorCreate, AuthorResponse, AuthorUpdate
-from app.services.author_service import create_author, get_authors, get_author_by_id, update_author, delete_author
+from app.dependencies.auth import require_manager
+from app.exceptions.author import AuthorNotFoundError, InvalidAuthorIdError
+from app.schemas.author import AuthorCreate, AuthorUpdate, AuthorUserResponse, AuthorManagerResponse
+from app.services.author_service import create_author, get_authors, get_active_authors, get_author_by_id, update_author, delete_author
 
 
 router = APIRouter(prefix="/authors", tags=["Authors"])
 
 
-@router.post("/", response_model=AuthorResponse, status_code=status.HTTP_201_CREATED)
-async def create_author_endpoint(author: AuthorCreate):
+@router.post("/", response_model=AuthorManagerResponse, status_code=status.HTTP_201_CREATED)
+async def create_author_endpoint(
+    author: AuthorCreate,
+    current_user: dict = Depends(require_manager),
+):
     return await create_author(author)
 
 
-@router.get("/", response_model=list[AuthorResponse])
-async def get_authors_endpoint():
+@router.get("/", response_model=list[AuthorUserResponse])
+async def get_active_authors_endpoint():
+    return await get_active_authors()
+
+
+@router.get("/manager", response_model=list[AuthorManagerResponse])
+async def get_authors_manager_endpoint(
+    current_user: dict = Depends(require_manager),
+):
     return await get_authors()
 
 
-@router.get("/{author_id}", response_model=AuthorResponse)
+@router.get("/manager/{author_id}", response_model=AuthorManagerResponse)
+async def get_author_manager_endpoint(
+    author_id: str,
+    current_user: dict = Depends(require_manager),
+):
+    try:
+        return await get_author_by_id(author_id)
+
+    except (InvalidAuthorIdError, AuthorNotFoundError):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Author not found",
+        )
+
+
+@router.get("/{author_id}", response_model=AuthorUserResponse)
 async def get_author_endpoint(author_id: str):
-    author = await get_author_by_id(author_id)
+    try:
+        author = await get_author_by_id(author_id)
 
-    if not author:
+        if not author["is_active"]:
+            raise AuthorNotFoundError
+
+        return author
+
+    except (InvalidAuthorIdError, AuthorNotFoundError):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Author not found",
         )
 
-    return author
 
+@router.patch("/{author_id}", response_model=AuthorManagerResponse)
+async def update_author_endpoint(
+    author_id: str,
+    author: AuthorUpdate,
+    current_user: dict = Depends(require_manager),
+):
+    try:
+        return await update_author(author_id, author)
 
-@router.patch("/{author_id}", response_model=AuthorResponse)
-async def update_author_endpoint(author_id: str, author: AuthorUpdate):
-    updated_author = await update_author(author_id, author)
-
-    if not updated_author:
+    except (InvalidAuthorIdError, AuthorNotFoundError):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Author not found",
         )
 
-    return updated_author
 
+@router.delete("/{author_id}", response_model=AuthorManagerResponse)
+async def delete_author_endpoint(
+    author_id: str,
+    current_user: dict = Depends(require_manager),
+):
+    try:
+        return await delete_author(author_id)
 
-@router.delete("/{author_id}", response_model=AuthorResponse)
-async def delete_author_endpoint(author_id: str):
-    deleted_author = await delete_author(author_id)
-
-    if not deleted_author:
+    except (InvalidAuthorIdError, AuthorNotFoundError):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Author not found",
         )
-
-    return deleted_author
