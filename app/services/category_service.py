@@ -1,11 +1,13 @@
-from app.db.collections import get_category_collection
-from app.schemas.category import CategoryCreate, CategoryUpdate
+import logging
+from datetime import datetime, UTC
 
 from bson import ObjectId
 from bson.errors import InvalidId
 
-import logging
-from datetime import datetime, UTC
+from app.db.collections import get_category_collection
+from app.exceptions.category import CategoryNotFoundError, InvalidCategoryIdError, InvalidParentCategoryError, CategorySlugAlreadyExistsError
+from app.schemas.category import CategoryCreate, CategoryUpdate
+
 
 logger = logging.getLogger(__name__)
 
@@ -20,26 +22,34 @@ def serialize_category(category):
         "parent_id": category.get("parent_id"),
         "is_active": category["is_active"],
         "created_at": category["created_at"],
-        "updated_at": category["updated_at"]
+        "updated_at": category["updated_at"],
     }
+
+
+def parse_object_id(object_id: str):
+    try:
+        return ObjectId(object_id)
+    except InvalidId as exc:
+        raise InvalidCategoryIdError from exc
 
 
 async def validate_parent_category(parent_id: str | None):
     if parent_id is None:
-        return True
+        return
 
     category_collection = get_category_collection()
 
     try:
         object_id = ObjectId(parent_id)
-    except InvalidId:
-        return False
+    except InvalidId as exc:
+        raise InvalidParentCategoryError from exc
 
     parent_category = await category_collection.find_one(
         {"_id": object_id, "is_active": True}
     )
 
-    return parent_category is not None
+    if not parent_category:
+        raise InvalidParentCategoryError
 
 
 async def validate_unique_slug(slug: str, category_id: str | None = None):
@@ -48,32 +58,21 @@ async def validate_unique_slug(slug: str, category_id: str | None = None):
     query = {"slug": slug}
 
     if category_id:
-        try:
-            object_id = ObjectId(category_id)
-        except InvalidId:
-            return False
-
+        object_id = parse_object_id(category_id)
         query["_id"] = {"$ne": object_id}
 
     existing_category = await category_collection.find_one(query)
 
-    return existing_category is None
+    if existing_category:
+        raise CategorySlugAlreadyExistsError
 
 
 async def create_category(category: CategoryCreate):
+    category_collection = get_category_collection()
     category_data = category.model_dump()
 
-    category_collection = get_category_collection()
-
-    is_parent_valid = await validate_parent_category(category_data.get("parent_id"))
-
-    if not is_parent_valid:
-        return None
-    
-    is_slug_unique = await validate_unique_slug(category_data["slug"])
-
-    if not is_slug_unique:
-        return None
+    await validate_parent_category(category_data.get("parent_id"))
+    await validate_unique_slug(category_data["slug"])
 
     now = datetime.now(UTC)
 
@@ -91,6 +90,15 @@ async def create_category(category: CategoryCreate):
     return serialize_category(created_category)
 
 
+async def get_active_categories():
+    category_collection = get_category_collection()
+
+    categories = await category_collection.find(
+        {"is_active": True}
+    ).to_list(length=100)
+
+    return [serialize_category(category) for category in categories]
+
 
 async def get_categories():
     category_collection = get_category_collection()
@@ -103,17 +111,12 @@ async def get_categories():
 async def get_category_by_id(category_id: str):
     category_collection = get_category_collection()
 
-    try:
-        object_id = ObjectId(category_id)
-    except InvalidId:
-        return None
+    object_id = parse_object_id(category_id)
 
-    category = await category_collection.find_one(
-        {"_id": object_id}
-    )
+    category = await category_collection.find_one({"_id": object_id})
 
     if not category:
-        return None
+        raise CategoryNotFoundError
 
     return serialize_category(category)
 
@@ -121,24 +124,14 @@ async def get_category_by_id(category_id: str):
 async def update_category(category_id: str, category: CategoryUpdate):
     category_collection = get_category_collection()
 
-    try:
-        object_id = ObjectId(category_id)
-    except InvalidId:
-        return None
-
+    object_id = parse_object_id(category_id)
     update_data = category.model_dump(exclude_unset=True)
 
     if "slug" in update_data:
-        is_slug_unique = await validate_unique_slug(update_data["slug"], category_id)
-
-        if not is_slug_unique:
-            return None
+        await validate_unique_slug(update_data["slug"], category_id)
 
     if "parent_id" in update_data:
-        is_parent_valid = await validate_parent_category(update_data["parent_id"])
-
-        if not is_parent_valid:
-            return None
+        await validate_parent_category(update_data["parent_id"])
 
     if not update_data:
         return await get_category_by_id(category_id)
@@ -151,11 +144,9 @@ async def update_category(category_id: str, category: CategoryUpdate):
     )
 
     if result.matched_count == 0:
-        return None
+        raise CategoryNotFoundError
 
-    updated_category = await category_collection.find_one(
-        {"_id": object_id}
-    )
+    updated_category = await category_collection.find_one({"_id": object_id})
 
     logger.info("Category updated: %s", category_id)
     return serialize_category(updated_category)
@@ -164,22 +155,17 @@ async def update_category(category_id: str, category: CategoryUpdate):
 async def delete_category(category_id: str):
     category_collection = get_category_collection()
 
-    try:
-        object_id = ObjectId(category_id)
-    except InvalidId:
-        return None
+    object_id = parse_object_id(category_id)
 
     result = await category_collection.update_one(
         {"_id": object_id},
-        {"$set": {"is_active": False, "updated_at": datetime.now(UTC)}}
+        {"$set": {"is_active": False, "updated_at": datetime.now(UTC)}},
     )
 
     if result.matched_count == 0:
-        return None
+        raise CategoryNotFoundError
 
-    deleted_category = await category_collection.find_one(
-        {"_id": object_id}
-    )
+    deleted_category = await category_collection.find_one({"_id": object_id})
 
     logger.info("Category deactivated: %s", category_id)
     return serialize_category(deleted_category)

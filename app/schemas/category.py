@@ -1,8 +1,7 @@
-from pydantic import BaseModel, Field
-
 from datetime import datetime
-
 from enum import Enum
+
+from pydantic import BaseModel, Field
 
 
 class CategoryType(str, Enum):
@@ -27,13 +26,16 @@ class CategoryUpdate(BaseModel):
     is_active: bool | None = None
 
 
-class CategoryResponse(BaseModel):
+class CategoryUserResponse(BaseModel):
     id: str
     name: str
     slug: str
     category_type: CategoryType
     description: str | None = None
     parent_id: str | None = None
+
+
+class CategoryManagerResponse(CategoryUserResponse):
     is_active: bool
     created_at: datetime
     updated_at: datetime

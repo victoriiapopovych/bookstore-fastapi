@@ -18,12 +18,15 @@ class AuthorUpdate(BaseModel):
     is_active: bool | None = None
 
 
-class AuthorResponse(BaseModel):
+class AuthorUserResponse(BaseModel):
     id: str
     name: str
     biography: str | None = None
     country: str | None = None
     birth_date: date | None = None
+
+
+class AuthorManagerResponse(AuthorUserResponse):
     is_active: bool
     created_at: datetime
     updated_at: datetime
