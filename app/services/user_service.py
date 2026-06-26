@@ -43,7 +43,7 @@ async def get_user_by_id(user_id: str):
     )
 
 
-async def register_user(user: UserRegister):
+async def register_user(user: UserRegister, role: UserRole = UserRole.CUSTOMER):
     user_collection = get_user_collection()
 
     existing_user = await get_user_by_email(user.email)
@@ -57,7 +57,7 @@ async def register_user(user: UserRegister):
 
     user_data["email"] = user_data["email"].lower()
     user_data["hashed_password"] = hash_password(password)
-    user_data["role"] = UserRole.CUSTOMER.value
+    user_data["role"] = role.value
     user_data["is_active"] = True
     user_data["created_at"] = now
     user_data["updated_at"] = now
