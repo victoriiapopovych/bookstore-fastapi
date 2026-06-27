@@ -58,7 +58,7 @@ class DiscountUpdate(BaseModel):
         return self
 
 
-class DiscountResponse(BaseModel):
+class DiscountUserResponse(BaseModel):
     id: str
     name: str
     discount_type: DiscountType
@@ -67,6 +67,9 @@ class DiscountResponse(BaseModel):
     target_id: str
     start_date: datetime
     end_date: datetime
+
+
+class DiscountManagerResponse(DiscountUserResponse):
     is_active: bool
     created_at: datetime
     updated_at: datetime

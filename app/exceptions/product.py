@@ -19,3 +19,13 @@ class InvalidProductCategoryError(AppException):
 class InvalidProductAuthorsError(AppException):
     status_code = 400
     detail = "Invalid author_ids"
+
+
+class InvalidProductDetailsError(AppException):
+    status_code = 400
+    detail = "Invalid product details"
+
+
+class ProductIsbnAlreadyExistsError(AppException):
+    status_code = 400
+    detail = "Product ISBN already exists"

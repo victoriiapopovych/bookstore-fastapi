@@ -14,3 +14,8 @@ class InvalidBundleIdError(AppException):
 class InvalidBundleProductsError(AppException):
     status_code = 400
     detail = "Invalid product_ids"
+
+
+class DuplicateBundleProductsError(AppException):
+    status_code = 400
+    detail = "Duplicate product_ids in bundle"

@@ -6,7 +6,7 @@ from bson import ObjectId
 from bson.errors import InvalidId
 
 from app.db.collections import get_bundle_collection, get_product_collection
-from app.exceptions.bundle import BundleNotFoundError, InvalidBundleIdError, InvalidBundleProductsError
+from app.exceptions.bundle import BundleNotFoundError, InvalidBundleIdError, InvalidBundleProductsError, DuplicateBundleProductsError
 from app.schemas.bundle import BundleCreate, BundleUpdate
 from app.services.discount_calculation_service import calculate_bundle_price
 
@@ -44,6 +44,11 @@ async def calculate_bundle_prices(items: list[dict], discount_percent: int):
     product_collection = get_product_collection()
 
     product_ids = []
+
+    item_product_ids = [item["product_id"] for item in items]
+
+    if len(item_product_ids) != len(set(item_product_ids)):
+        raise DuplicateBundleProductsError
 
     for item in items:
         try:

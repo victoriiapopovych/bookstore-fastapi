@@ -5,7 +5,7 @@ from bson import ObjectId
 from bson.errors import InvalidId
 
 from app.db.collections import get_product_collection, get_category_collection, get_author_collection
-from app.exceptions.product import ProductNotFoundError, InvalidProductIdError, InvalidProductCategoryError, InvalidProductAuthorsError
+from app.exceptions.product import ProductNotFoundError, InvalidProductIdError, InvalidProductCategoryError, InvalidProductAuthorsError, InvalidProductDetailsError, ProductIsbnAlreadyExistsError
 from app.schemas.product import ProductCreate, ProductUpdate, ProductType
 from app.services.discount_calculation_service import calculate_product_price
 
@@ -84,6 +84,22 @@ async def validate_authors_exist(author_ids: list[str]):
 
     if count != len(author_ids):
         raise InvalidProductAuthorsError
+    
+
+async def validate_unique_isbn(isbn: str, product_id: str | None = None):
+    product_collection = get_product_collection()
+
+    query = {
+        "book_details.isbn": isbn,
+    }
+
+    if product_id:
+        query["_id"] = {"$ne": parse_product_object_id(product_id)}
+
+    existing_product = await product_collection.find_one(query)
+
+    if existing_product:
+        raise ProductIsbnAlreadyExistsError
 
 
 async def create_product(product: ProductCreate):
@@ -100,6 +116,9 @@ async def create_product(product: ProductCreate):
     if product.product_type == ProductType.BOOK:
         author_ids = product_data["book_details"]["author_ids"]
         await validate_authors_exist(author_ids)
+
+        isbn = product_data["book_details"]["isbn"]
+        await validate_unique_isbn(isbn)
 
     now = datetime.now(UTC)
 
@@ -174,9 +193,19 @@ async def update_product(product_id: str, product: ProductUpdate):
             product_type,
         )
 
+    if "book_details" in update_data:
+        if existing_product["product_type"] == ProductType.ACCESSORY:
+            raise InvalidProductDetailsError
+
+        if update_data["book_details"] is None:
+            raise InvalidProductDetailsError
+
     if "book_details" in update_data and update_data["book_details"] is not None:
         author_ids = update_data["book_details"]["author_ids"]
         await validate_authors_exist(author_ids)
+
+        isbn = update_data["book_details"]["isbn"]
+        await validate_unique_isbn(isbn, product_id)
 
     update_data["updated_at"] = datetime.now(UTC)
 
