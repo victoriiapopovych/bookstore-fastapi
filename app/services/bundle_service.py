@@ -6,8 +6,8 @@ from bson import ObjectId
 from bson.errors import InvalidId
 
 from app.db.collections import get_bundle_collection, get_product_collection
+from app.exceptions.bundle import BundleNotFoundError, InvalidBundleIdError, InvalidBundleProductsError
 from app.schemas.bundle import BundleCreate, BundleUpdate
-
 from app.services.discount_calculation_service import calculate_bundle_price
 
 
@@ -33,6 +33,13 @@ async def serialize_bundle(bundle):
     }
 
 
+def parse_bundle_object_id(bundle_id: str):
+    try:
+        return ObjectId(bundle_id)
+    except InvalidId as exc:
+        raise InvalidBundleIdError from exc
+
+
 async def calculate_bundle_prices(items: list[dict], discount_percent: int):
     product_collection = get_product_collection()
 
@@ -41,8 +48,8 @@ async def calculate_bundle_prices(items: list[dict], discount_percent: int):
     for item in items:
         try:
             product_ids.append(ObjectId(item["product_id"]))
-        except InvalidId:
-            return None
+        except InvalidId as exc:
+            raise InvalidBundleProductsError from exc
 
     products = await product_collection.find(
         {
@@ -54,7 +61,7 @@ async def calculate_bundle_prices(items: list[dict], discount_percent: int):
     products_by_id = {str(product["_id"]): product for product in products}
 
     if len(products_by_id) != len(set(item["product_id"] for item in items)):
-        return None
+        raise InvalidBundleProductsError
 
     original_price = Decimal("0")
 
@@ -62,7 +69,7 @@ async def calculate_bundle_prices(items: list[dict], discount_percent: int):
         product = products_by_id.get(item["product_id"])
 
         if not product:
-            return None
+            raise InvalidBundleProductsError
 
         original_price += Decimal(str(product["price"])) * item["quantity"]
 
@@ -74,18 +81,12 @@ async def calculate_bundle_prices(items: list[dict], discount_percent: int):
 
 async def create_bundle(bundle: BundleCreate):
     bundle_collection = get_bundle_collection()
-
     bundle_data = bundle.model_dump()
 
-    prices = await calculate_bundle_prices(
+    original_price, final_price = await calculate_bundle_prices(
         bundle_data["items"],
         bundle_data["discount_percent"],
     )
-
-    if not prices:
-        return None
-
-    original_price, final_price = prices
 
     now = datetime.now(UTC)
 
@@ -105,6 +106,16 @@ async def create_bundle(bundle: BundleCreate):
     return await serialize_bundle(created_bundle)
 
 
+async def get_active_bundles():
+    bundle_collection = get_bundle_collection()
+
+    bundles = await bundle_collection.find(
+        {"is_active": True}
+    ).to_list(length=100)
+
+    return [await serialize_bundle(bundle) for bundle in bundles]
+
+
 async def get_bundles():
     bundle_collection = get_bundle_collection()
 
@@ -116,15 +127,12 @@ async def get_bundles():
 async def get_bundle_by_id(bundle_id: str):
     bundle_collection = get_bundle_collection()
 
-    try:
-        object_id = ObjectId(bundle_id)
-    except InvalidId:
-        return None
+    object_id = parse_bundle_object_id(bundle_id)
 
     bundle = await bundle_collection.find_one({"_id": object_id})
 
     if not bundle:
-        return None
+        raise BundleNotFoundError
 
     return await serialize_bundle(bundle)
 
@@ -132,15 +140,12 @@ async def get_bundle_by_id(bundle_id: str):
 async def update_bundle(bundle_id: str, bundle: BundleUpdate):
     bundle_collection = get_bundle_collection()
 
-    try:
-        object_id = ObjectId(bundle_id)
-    except InvalidId:
-        return None
+    object_id = parse_bundle_object_id(bundle_id)
 
     existing_bundle = await bundle_collection.find_one({"_id": object_id})
 
     if not existing_bundle:
-        return None
+        raise BundleNotFoundError
 
     update_data = bundle.model_dump(exclude_unset=True)
 
@@ -154,25 +159,20 @@ async def update_bundle(bundle_id: str, bundle: BundleUpdate):
     )
 
     if "items" in update_data or "discount_percent" in update_data:
-        prices = await calculate_bundle_prices(items, discount_percent)
-
-        if not prices:
-            return None
-
-        original_price, final_price = prices
+        original_price, final_price = await calculate_bundle_prices(
+            items,
+            discount_percent,
+        )
 
         update_data["original_price"] = float(original_price)
         update_data["final_price"] = float(final_price)
 
     update_data["updated_at"] = datetime.now(UTC)
 
-    result = await bundle_collection.update_one(
+    await bundle_collection.update_one(
         {"_id": object_id},
         {"$set": update_data},
     )
-
-    if result.matched_count == 0:
-        return None
 
     updated_bundle = await bundle_collection.find_one({"_id": object_id})
 
@@ -183,10 +183,7 @@ async def update_bundle(bundle_id: str, bundle: BundleUpdate):
 async def delete_bundle(bundle_id: str):
     bundle_collection = get_bundle_collection()
 
-    try:
-        object_id = ObjectId(bundle_id)
-    except InvalidId:
-        return None
+    object_id = parse_bundle_object_id(bundle_id)
 
     result = await bundle_collection.update_one(
         {"_id": object_id},
@@ -199,7 +196,7 @@ async def delete_bundle(bundle_id: str):
     )
 
     if result.matched_count == 0:
-        return None
+        raise BundleNotFoundError
 
     deleted_bundle = await bundle_collection.find_one({"_id": object_id})
 

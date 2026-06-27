@@ -1,14 +1,21 @@
-class CategoryNotFoundError(Exception):
-    pass
+from app.exceptions.base import AppException
 
 
-class InvalidCategoryIdError(Exception):
-    pass
+class CategoryNotFoundError(AppException):
+    status_code = 404
+    detail = "Category not found"
 
 
-class InvalidParentCategoryError(Exception):
-    pass
+class InvalidCategoryIdError(AppException):
+    status_code = 404
+    detail = "Category not found"
 
 
-class CategorySlugAlreadyExistsError(Exception):
-    pass
+class InvalidParentCategoryError(AppException):
+    status_code = 400
+    detail = "Invalid parent_id"
+
+
+class CategorySlugAlreadyExistsError(AppException):
+    status_code = 400
+    detail = "Category slug already exists"

@@ -16,6 +16,9 @@ from app.api.discounts import router as discounts_router
 from app.api.auth import router as auth_router
 from app.api.users import router as users_router
 
+from app.exceptions.base import AppException
+from app.exception_handlers import app_exception_handler
+
 from app.core.logging import setup_logging
 
 setup_logging()
@@ -32,6 +35,8 @@ app = FastAPI(
     title=settings.PROJECT_NAME,
     lifespan=lifespan,
 )
+
+app.add_exception_handler(AppException, app_exception_handler)
 
 app.include_router(health_router)
 app.include_router(categories_router)

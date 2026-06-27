@@ -31,7 +31,7 @@ class BundleUpdate(BaseModel):
     is_active: bool | None = None
 
 
-class BundleResponse(BaseModel):
+class BundleUserResponse(BaseModel):
     id: str
     name: str
     description: str
@@ -41,6 +41,9 @@ class BundleResponse(BaseModel):
     final_price: Decimal
     discounted_price: Decimal
     active_discount: ActiveDiscountResponse | None = None
+
+
+class BundleManagerResponse(BundleUserResponse):
     is_active: bool
     created_at: datetime
     updated_at: datetime

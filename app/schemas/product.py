@@ -62,18 +62,21 @@ class ProductUpdate(BaseModel):
     is_active: bool | None = None
 
 
-class ProductResponse(BaseModel):
+class ProductUserResponse(BaseModel):
     id: str
     name: str
     description: str
     price: Decimal
-    stock_quantity: int
     category_id: str
     product_type: ProductType
     book_details: BookDetails | None = None
     original_price: Decimal
     final_price: Decimal
     active_discount: ActiveDiscountResponse | None = None
+
+
+class ProductManagerResponse(ProductUserResponse):
+    stock_quantity: int
     is_active: bool
     created_at: datetime
     updated_at: datetime
