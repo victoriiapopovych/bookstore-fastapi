@@ -27,12 +27,15 @@ class UserUpdate(BaseModel):
     password: str | None = Field(None, min_length=8, max_length=72)
 
 
-class UserResponse(BaseModel):
+class UserSelfResponse(BaseModel):
     id: str
     email: EmailStr
     first_name: str
     last_name: str
     role: UserRole
-    is_active: bool
     created_at: datetime
     updated_at: datetime
+
+
+class UserManagerResponse(UserSelfResponse):
+    is_active: bool

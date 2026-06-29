@@ -1,13 +1,14 @@
 from datetime import datetime, UTC
+import logging
 
 from bson import ObjectId
 from bson.errors import InvalidId
 
 from app.core.security import hash_password, verify_password
 from app.db.collections import get_user_collection
+from app.exceptions.user import UserNotFoundError, InvalidUserIdError, UserEmailAlreadyExistsError
 from app.schemas.user import UserRegister, UserUpdate, UserRole
 
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -25,30 +26,45 @@ def serialize_user(user):
     }
 
 
+def parse_user_object_id(user_id: str):
+    try:
+        return ObjectId(user_id)
+    except InvalidId as exc:
+        raise InvalidUserIdError from exc
+
+
 async def get_user_by_email(email: str):
     user_collection = get_user_collection()
     return await user_collection.find_one({"email": email.lower()})
 
 
-async def get_user_by_id(user_id: str):
+async def get_user_document_by_id(user_id: str):
     user_collection = get_user_collection()
 
-    try:
-        object_id = ObjectId(user_id)
-    except InvalidId:
-        return None
+    object_id = parse_user_object_id(user_id)
 
-    return await user_collection.find_one(
+    user = await user_collection.find_one(
         {"_id": object_id, "is_active": True}
     )
+
+    if not user:
+        raise UserNotFoundError
+
+    return user
+
+
+async def get_user_by_id(user_id: str):
+    user = await get_user_document_by_id(user_id)
+    return serialize_user(user)
 
 
 async def register_user(user: UserRegister, role: UserRole = UserRole.CUSTOMER):
     user_collection = get_user_collection()
 
     existing_user = await get_user_by_email(user.email)
+
     if existing_user:
-        return None
+        raise UserEmailAlreadyExistsError
 
     user_data = user.model_dump()
     password = user_data.pop("password")
@@ -98,16 +114,19 @@ async def get_users():
 async def update_user(user_id: str, user: UserUpdate):
     user_collection = get_user_collection()
 
-    try:
-        object_id = ObjectId(user_id)
-    except InvalidId:
-        return None
+    object_id = parse_user_object_id(user_id)
+
+    existing_user = await user_collection.find_one(
+        {"_id": object_id, "is_active": True}
+    )
+
+    if not existing_user:
+        raise UserNotFoundError
 
     update_data = user.model_dump(exclude_unset=True)
 
     if not update_data:
-        existing_user = await get_user_by_id(user_id)
-        return serialize_user(existing_user) if existing_user else None
+        return serialize_user(existing_user)
 
     if "password" in update_data:
         password = update_data.pop("password")
@@ -115,26 +134,21 @@ async def update_user(user_id: str, user: UserUpdate):
 
     update_data["updated_at"] = datetime.now(UTC)
 
-    result = await user_collection.update_one(
+    await user_collection.update_one(
         {"_id": object_id, "is_active": True},
         {"$set": update_data},
     )
 
-    if result.matched_count == 0:
-        return None
-
     updated_user = await user_collection.find_one({"_id": object_id})
 
+    logger.info("User updated: %s", user_id)
     return serialize_user(updated_user)
 
 
-async def delete_user(user_id: str):
+async def deactivate_user(user_id: str):
     user_collection = get_user_collection()
 
-    try:
-        object_id = ObjectId(user_id)
-    except InvalidId:
-        return None
+    object_id = parse_user_object_id(user_id)
 
     result = await user_collection.update_one(
         {"_id": object_id, "is_active": True},
@@ -147,9 +161,9 @@ async def delete_user(user_id: str):
     )
 
     if result.matched_count == 0:
-        return None
+        raise UserNotFoundError
 
-    deleted_user = await user_collection.find_one({"_id": object_id})
+    deactivated_user = await user_collection.find_one({"_id": object_id})
 
     logger.info("User deactivated: %s", user_id)
-    return serialize_user(deleted_user)
+    return serialize_user(deactivated_user)

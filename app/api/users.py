@@ -1,42 +1,40 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 
-from app.dependencies.auth import get_current_user
-from app.schemas.user import UserResponse, UserUpdate
-from app.services.user_service import delete_user, get_users, update_user, serialize_user
+from app.dependencies.auth import get_current_user, require_manager
+from app.exceptions.user import CannotDeactivateSelfError
+from app.schemas.user import UserSelfResponse, UserManagerResponse, UserUpdate
+from app.services.user_service import serialize_user, get_users, get_user_by_id, update_user, deactivate_user
 
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
 
-@router.get("/me", response_model=UserResponse)
-async def get_my_profile_endpoint(current_user=Depends(get_current_user)):
+@router.get("/me", response_model=UserSelfResponse)
+async def get_my_profile_endpoint(current_user=Depends(get_current_user),):
     return serialize_user(current_user)
 
 
-@router.patch("/me", response_model=UserResponse)
-async def update_my_profile_endpoint(
-    user: UserUpdate,
-    current_user=Depends(get_current_user),
-):
-    updated_user = await update_user(str(current_user["_id"]), user)
-
-    if not updated_user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
-        )
-
-    return updated_user
+@router.patch("/me", response_model=UserSelfResponse)
+async def update_my_profile_endpoint(user: UserUpdate, current_user=Depends(get_current_user),):
+    return await update_user(
+        str(current_user["_id"]),
+        user,
+    )
 
 
-@router.delete("/me", response_model=UserResponse)
-async def delete_my_account_endpoint(current_user=Depends(get_current_user)):
-    deleted_user = await delete_user(str(current_user["_id"]))
+@router.get("/manager", response_model=list[UserManagerResponse], dependencies=[Depends(require_manager)],)
+async def get_users_endpoint():
+    return await get_users()
 
-    if not deleted_user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
-        )
 
-    return deleted_user
+@router.get("/manager/{user_id}", response_model=UserManagerResponse, dependencies=[Depends(require_manager)],)
+async def get_user_endpoint(user_id: str):
+    return await get_user_by_id(user_id)
+
+
+@router.delete("/manager/{user_id}", response_model=UserManagerResponse, dependencies=[Depends(require_manager)],)
+async def deactivate_user_endpoint(user_id: str, current_user=Depends(get_current_user),):
+    if str(current_user["_id"]) == user_id:
+        raise CannotDeactivateSelfError
+
+    return await deactivate_user(user_id)

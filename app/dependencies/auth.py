@@ -3,7 +3,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 
 from app.core.config import settings
-from app.services.user_service import get_user_by_id
+from app.services.user_service import get_user_document_by_id
 
 from app.schemas.user import UserRole
 
@@ -36,7 +36,7 @@ async def get_current_user(
     except JWTError:
         raise credentials_exception
 
-    user = await get_user_by_id(user_id)
+    user = await get_user_document_by_id(user_id)
 
     if not user:
         raise credentials_exception
