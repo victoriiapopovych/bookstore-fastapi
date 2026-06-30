@@ -19,10 +19,10 @@ def serialize_category(category):
         "slug": category["slug"],
         "category_type": category["category_type"],
         "description": category.get("description"),
-        "parent_id": category.get("parent_id"),
         "is_active": category["is_active"],
-        "created_at": category["created_at"],
-        "updated_at": category["updated_at"],
+        "created_at": category.get("created_at"),
+        "updated_at": category.get("updated_at"),
+        "parent_id": category.get("parent_id"),
     }
 
 

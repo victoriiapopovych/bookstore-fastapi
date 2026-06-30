@@ -16,13 +16,18 @@ class CoverType(str, Enum):
 
 
 class BookDetails(BaseModel):
-    author_ids: list[str] = Field(..., min_length=1)
-    publisher: str = Field(..., min_length=2, max_length=100)
-    isbn: str = Field(..., min_length=10, max_length=17)
-    language: str = Field(..., min_length=2, max_length=50)
-    pages: int = Field(..., gt=0)
-    publication_year: int = Field(..., ge=0)
-    cover_type: CoverType
+    author_ids: list[str] = Field(default_factory=list)
+    publisher: str | None = Field(None, min_length=2, max_length=100)
+    isbn: str | None = Field(None, min_length=10, max_length=17)
+    language: str | None = Field(None, min_length=2, max_length=50)
+    pages: int | None = Field(None, gt=0)
+    publication_year: int | None = Field(None, ge=0)
+    cover_type: CoverType | None = None
+
+    upc: str | None = None
+    rating: int | None = Field(None, ge=1, le=5)
+    image_url: str | None = None
+    source_url: str | None = None
 
 
 class ActiveDiscountResponse(BaseModel):

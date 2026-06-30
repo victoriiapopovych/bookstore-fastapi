@@ -9,11 +9,10 @@ from app.exceptions.product import ProductNotFoundError, InvalidProductIdError, 
 from app.schemas.product import ProductCreate, ProductUpdate, ProductType
 from app.services.discount_calculation_service import calculate_product_price
 
-
 logger = logging.getLogger(__name__)
 
 
-async def serialize_product(product):
+async def serialize_product(product: dict):
     price_data = await calculate_product_price(product)
 
     return {
@@ -34,7 +33,7 @@ async def serialize_product(product):
     }
 
 
-def parse_product_object_id(product_id: str):
+def parse_product_object_id(product_id: str) -> ObjectId:
     try:
         return ObjectId(product_id)
     except InvalidId as exc:
@@ -62,6 +61,9 @@ async def validate_category_for_product(category_id: str, product_type: str):
 
 
 async def validate_authors_exist(author_ids: list[str]):
+    if not author_ids:
+        return
+
     if len(author_ids) != len(set(author_ids)):
         raise InvalidProductAuthorsError
 
@@ -84,9 +86,15 @@ async def validate_authors_exist(author_ids: list[str]):
 
     if count != len(author_ids):
         raise InvalidProductAuthorsError
-    
 
-async def validate_unique_isbn(isbn: str, product_id: str | None = None):
+
+async def validate_unique_isbn(
+    isbn: str | None,
+    product_id: str | None = None,
+):
+    if not isbn:
+        return
+
     product_collection = get_product_collection()
 
     query = {
@@ -102,6 +110,40 @@ async def validate_unique_isbn(isbn: str, product_id: str | None = None):
         raise ProductIsbnAlreadyExistsError
 
 
+async def validate_book_details_for_create(product_data: dict):
+    book_details = product_data.get("book_details") or {}
+
+    author_ids = book_details.get("author_ids", [])
+    await validate_authors_exist(author_ids)
+
+    isbn = book_details.get("isbn")
+    await validate_unique_isbn(isbn)
+
+
+async def validate_book_details_for_update(existing_product: dict, update_data: dict, product_id: str):
+    if "book_details" not in update_data:
+        return
+
+    if existing_product["product_type"] == ProductType.ACCESSORY:
+        raise InvalidProductDetailsError
+
+    existing_book_details = existing_product.get("book_details") or {}
+    new_book_details = update_data.get("book_details") or {}
+
+    merged_book_details = {
+        **existing_book_details,
+        **new_book_details,
+    }
+
+    author_ids = merged_book_details.get("author_ids", [])
+    await validate_authors_exist(author_ids)
+
+    isbn = merged_book_details.get("isbn")
+    await validate_unique_isbn(isbn, product_id)
+
+    update_data["book_details"] = merged_book_details
+
+
 async def create_product(product: ProductCreate):
     product_collection = get_product_collection()
 
@@ -114,11 +156,7 @@ async def create_product(product: ProductCreate):
     )
 
     if product.product_type == ProductType.BOOK:
-        author_ids = product_data["book_details"]["author_ids"]
-        await validate_authors_exist(author_ids)
-
-        isbn = product_data["book_details"]["isbn"]
-        await validate_unique_isbn(isbn)
+        await validate_book_details_for_create(product_data)
 
     now = datetime.now(UTC)
 
@@ -133,6 +171,7 @@ async def create_product(product: ProductCreate):
     )
 
     logger.info("Product created: %s", product_data["name"])
+
     return await serialize_product(created_product)
 
 
@@ -177,35 +216,25 @@ async def update_product(product_id: str, product: ProductUpdate):
     if not existing_product:
         raise ProductNotFoundError
 
-    update_data = product.model_dump(exclude_unset=True)
-
-    if "price" in update_data:
-        update_data["price"] = float(update_data["price"])
+    update_data = product.model_dump(exclude_unset=True, exclude_none=True)
 
     if not update_data:
         return await serialize_product(existing_product)
 
-    if "category_id" in update_data:
-        product_type = existing_product["product_type"]
+    if "price" in update_data:
+        update_data["price"] = float(update_data["price"])
 
+    if "category_id" in update_data:
         await validate_category_for_product(
             update_data["category_id"],
-            product_type,
+            existing_product["product_type"],
         )
 
-    if "book_details" in update_data:
-        if existing_product["product_type"] == ProductType.ACCESSORY:
-            raise InvalidProductDetailsError
-
-        if update_data["book_details"] is None:
-            raise InvalidProductDetailsError
-
-    if "book_details" in update_data and update_data["book_details"] is not None:
-        author_ids = update_data["book_details"]["author_ids"]
-        await validate_authors_exist(author_ids)
-
-        isbn = update_data["book_details"]["isbn"]
-        await validate_unique_isbn(isbn, product_id)
+    await validate_book_details_for_update(
+        existing_product=existing_product,
+        update_data=update_data,
+        product_id=product_id,
+    )
 
     update_data["updated_at"] = datetime.now(UTC)
 
@@ -217,6 +246,7 @@ async def update_product(product_id: str, product: ProductUpdate):
     updated_product = await product_collection.find_one({"_id": object_id})
 
     logger.info("Product updated: %s", product_id)
+
     return await serialize_product(updated_product)
 
 
@@ -241,4 +271,5 @@ async def delete_product(product_id: str):
     deleted_product = await product_collection.find_one({"_id": object_id})
 
     logger.info("Product deactivated: %s", product_id)
+
     return await serialize_product(deleted_product)
