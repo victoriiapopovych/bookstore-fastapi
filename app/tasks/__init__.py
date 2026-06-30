@@ -1,0 +1,1 @@
+from app.tasks.discount_tasks import deactivate_expired_discounts_task

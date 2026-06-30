@@ -17,7 +17,5 @@ async def connect_to_mongo():
 
 
 async def close_mongo_connection():
-    global client
-
     if client:
         client.close()
