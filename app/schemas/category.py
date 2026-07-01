@@ -39,3 +39,19 @@ class CategoryManagerResponse(CategoryUserResponse):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+
+
+class PaginatedCategoryUserResponse(BaseModel):
+    items: list[CategoryUserResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
+class PaginatedCategoryManagerResponse(BaseModel):
+    items: list[CategoryManagerResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int

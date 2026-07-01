@@ -15,6 +15,7 @@ from app.api.bundles import router as bundles_router
 from app.api.discounts import router as discounts_router
 from app.api.auth import router as auth_router
 from app.api.users import router as users_router
+from app.api.parser import router as parser_router
 
 from app.exceptions.base import AppException
 from app.exception_handlers import app_exception_handler
@@ -46,6 +47,8 @@ app.include_router(bundles_router)
 app.include_router(discounts_router)
 app.include_router(auth_router)
 app.include_router(users_router)
+
+app.include_router(parser_router)
 
 @app.get("/")
 async def root():

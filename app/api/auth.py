@@ -2,14 +2,14 @@ from fastapi import APIRouter, HTTPException, status
 
 from app.core.security import create_access_token
 from app.schemas.token import TokenResponse
-from app.schemas.user import UserLogin, UserRegister, UserResponse
+from app.schemas.user import UserLogin, UserRegister, UserSelfResponse
 from app.services.user_service import authenticate_user, register_user
 
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=UserSelfResponse, status_code=status.HTTP_201_CREATED)
 async def register_endpoint(user: UserRegister):
     created_user = await register_user(user)
 

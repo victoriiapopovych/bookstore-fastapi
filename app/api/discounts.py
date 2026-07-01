@@ -2,8 +2,10 @@ from fastapi import APIRouter, Depends, status
 
 from app.dependencies.auth import require_manager
 from app.exceptions.discount import DiscountNotFoundError
-from app.schemas.discount import DiscountCreate, DiscountUpdate, DiscountUserResponse, DiscountManagerResponse
+from app.schemas.discount import DiscountCreate, DiscountUpdate, DiscountUserResponse, DiscountManagerResponse, PaginatedDiscountManagerResponse, PaginatedDiscountUserResponse
 from app.services.discount_service import create_discount, get_discounts, get_active_discounts, get_discount_by_id, update_discount, delete_discount
+
+from app.utils.pagination import PaginationParams
 
 
 router = APIRouter(prefix="/discounts", tags=["Discounts"])
@@ -17,16 +19,19 @@ async def create_discount_endpoint(
     return await create_discount(discount)
 
 
-@router.get("/", response_model=list[DiscountUserResponse])
-async def get_active_discounts_endpoint():
-    return await get_active_discounts()
+@router.get("/", response_model=PaginatedDiscountUserResponse)
+async def get_active_discounts_endpoint(
+    pagination: PaginationParams = Depends(),
+):
+    return await get_active_discounts(pagination)
 
 
-@router.get("/manager", response_model=list[DiscountManagerResponse])
+@router.get("/manager", response_model=PaginatedDiscountManagerResponse)
 async def get_discounts_manager_endpoint(
+    pagination: PaginationParams = Depends(),
     current_user: dict = Depends(require_manager),
 ):
-    return await get_discounts()
+    return await get_discounts(pagination)
 
 
 @router.get("/manager/{discount_id}", response_model=DiscountManagerResponse)

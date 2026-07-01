@@ -2,8 +2,10 @@ from fastapi import APIRouter, Depends, status
 
 from app.dependencies.auth import require_manager
 from app.exceptions.category import CategoryNotFoundError
-from app.schemas.category import CategoryCreate, CategoryUpdate, CategoryUserResponse, CategoryManagerResponse
+from app.schemas.category import CategoryCreate, CategoryUpdate, CategoryUserResponse, CategoryManagerResponse, PaginatedCategoryManagerResponse, PaginatedCategoryUserResponse
 from app.services.category_service import create_category, get_categories, get_active_categories, get_category_by_id, update_category, delete_category
+
+from app.utils.pagination import PaginationParams
 
 
 router = APIRouter(prefix="/categories", tags=["Categories"])
@@ -17,16 +19,19 @@ async def create_category_endpoint(
     return await create_category(category)
 
 
-@router.get("/", response_model=list[CategoryUserResponse])
-async def get_active_categories_endpoint():
-    return await get_active_categories()
+@router.get("/", response_model=PaginatedCategoryUserResponse)
+async def get_active_categories_endpoint(
+    pagination: PaginationParams = Depends(),
+):
+    return await get_active_categories(pagination)
 
 
-@router.get("/manager", response_model=list[CategoryManagerResponse])
+@router.get("/manager", response_model=PaginatedCategoryManagerResponse)
 async def get_categories_manager_endpoint(
+    pagination: PaginationParams = Depends(),
     current_user: dict = Depends(require_manager),
 ):
-    return await get_categories()
+    return await get_categories(pagination)
 
 
 @router.get("/manager/{category_id}", response_model=CategoryManagerResponse)

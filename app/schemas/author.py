@@ -30,3 +30,19 @@ class AuthorManagerResponse(AuthorUserResponse):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+
+
+class PaginatedAuthorUserResponse(BaseModel):
+    items: list[AuthorUserResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
+class PaginatedAuthorManagerResponse(BaseModel):
+    items: list[AuthorManagerResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int

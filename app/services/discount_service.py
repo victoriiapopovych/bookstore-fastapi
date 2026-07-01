@@ -8,6 +8,8 @@ from app.db.collections import get_discount_collection, get_product_collection, 
 from app.exceptions.discount import DiscountNotFoundError, InvalidDiscountIdError, InvalidDiscountTargetError, DiscountOverlapError
 from app.schemas.discount import DiscountCreate, DiscountUpdate, DiscountTargetType
 
+from app.utils.pagination import PaginationParams, build_paginated_response, get_skip
+
 
 logger = logging.getLogger(__name__)
 
@@ -118,27 +120,59 @@ async def create_discount(discount: DiscountCreate):
     return serialize_discount(created_discount)
 
 
-async def get_active_discounts():
+async def get_active_discounts(pagination: PaginationParams):
     discount_collection = get_discount_collection()
     now = datetime.now(UTC)
 
-    discounts = await discount_collection.find(
-        {
-            "is_active": True,
-            "start_date": {"$lte": now},
-            "end_date": {"$gte": now},
-        }
-    ).to_list(length=100)
+    query = {
+        "is_active": True,
+        "start_date": {"$lte": now},
+        "end_date": {"$gte": now},
+    }
 
-    return [serialize_discount(discount) for discount in discounts]
+    total = await discount_collection.count_documents(query)
+
+    discounts = await discount_collection.find(query).skip(
+        get_skip(pagination)
+    ).limit(
+        pagination.page_size
+    ).to_list(length=pagination.page_size)
+
+    serialized_discounts = [
+        serialize_discount(discount)
+        for discount in discounts
+    ]
+
+    return build_paginated_response(
+        items=serialized_discounts,
+        total=total,
+        params=pagination,
+    )
 
 
-async def get_discounts():
+async def get_discounts(pagination: PaginationParams):
     discount_collection = get_discount_collection()
 
-    discounts = await discount_collection.find().to_list(length=100)
+    query = {}
 
-    return [serialize_discount(discount) for discount in discounts]
+    total = await discount_collection.count_documents(query)
+
+    discounts = await discount_collection.find(query).skip(
+        get_skip(pagination)
+    ).limit(
+        pagination.page_size
+    ).to_list(length=pagination.page_size)
+
+    serialized_discounts = [
+        serialize_discount(discount)
+        for discount in discounts
+    ]
+
+    return build_paginated_response(
+        items=serialized_discounts,
+        total=total,
+        params=pagination,
+    )
 
 
 async def get_discount_by_id(discount_id: str):

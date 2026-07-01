@@ -39,3 +39,11 @@ class UserSelfResponse(BaseModel):
 
 class UserManagerResponse(UserSelfResponse):
     is_active: bool
+
+
+class PaginatedUserManagerResponse(BaseModel):
+    items: list[UserManagerResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int

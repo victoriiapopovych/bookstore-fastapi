@@ -2,8 +2,10 @@ from fastapi import APIRouter, Depends, status
 
 from app.dependencies.auth import require_manager
 from app.exceptions.product import ProductNotFoundError
-from app.schemas.product import ProductCreate, ProductUpdate, ProductUserResponse, ProductManagerResponse
+from app.schemas.product import ProductCreate, ProductUpdate, ProductUserResponse, ProductManagerResponse, PaginatedProductUserResponse, PaginatedProductManagerResponse
 from app.services.product_service import create_product, get_products, get_active_products, get_product_by_id, update_product, delete_product
+
+from app.utils.pagination import PaginationParams
 
 
 router = APIRouter(prefix="/products", tags=["Products"])
@@ -17,16 +19,19 @@ async def create_product_endpoint(
     return await create_product(product)
 
 
-@router.get("/", response_model=list[ProductUserResponse])
-async def get_active_products_endpoint():
-    return await get_active_products()
+@router.get("/", response_model=PaginatedProductUserResponse)
+async def get_active_products_endpoint(
+    pagination: PaginationParams = Depends(),
+):
+    return await get_active_products(pagination)
 
 
-@router.get("/manager", response_model=list[ProductManagerResponse])
+@router.get("/manager", response_model=PaginatedProductManagerResponse)
 async def get_products_manager_endpoint(
+    pagination: PaginationParams = Depends(),
     current_user: dict = Depends(require_manager),
 ):
-    return await get_products()
+    return await get_products(pagination)
 
 
 @router.get("/manager/{product_id}", response_model=ProductManagerResponse)

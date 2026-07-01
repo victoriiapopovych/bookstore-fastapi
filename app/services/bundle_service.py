@@ -10,6 +10,8 @@ from app.exceptions.bundle import BundleNotFoundError, InvalidBundleIdError, Inv
 from app.schemas.bundle import BundleCreate, BundleUpdate
 from app.services.discount_calculation_service import calculate_bundle_price
 
+from app.utils.pagination import PaginationParams, build_paginated_response, get_skip
+
 
 logger = logging.getLogger(__name__)
 
@@ -111,22 +113,54 @@ async def create_bundle(bundle: BundleCreate):
     return await serialize_bundle(created_bundle)
 
 
-async def get_active_bundles():
+async def get_active_bundles(pagination: PaginationParams):
     bundle_collection = get_bundle_collection()
 
-    bundles = await bundle_collection.find(
-        {"is_active": True}
-    ).to_list(length=100)
+    query = {"is_active": True}
 
-    return [await serialize_bundle(bundle) for bundle in bundles]
+    total = await bundle_collection.count_documents(query)
+
+    bundles = await bundle_collection.find(query).skip(
+        get_skip(pagination)
+    ).limit(
+        pagination.page_size
+    ).to_list(length=pagination.page_size)
+
+    serialized_bundles = [
+        await serialize_bundle(bundle)
+        for bundle in bundles
+    ]
+
+    return build_paginated_response(
+        items=serialized_bundles,
+        total=total,
+        params=pagination,
+    )
 
 
-async def get_bundles():
+async def get_bundles(pagination: PaginationParams):
     bundle_collection = get_bundle_collection()
 
-    bundles = await bundle_collection.find().to_list(length=100)
+    query = {}
 
-    return [await serialize_bundle(bundle) for bundle in bundles]
+    total = await bundle_collection.count_documents(query)
+
+    bundles = await bundle_collection.find(query).skip(
+        get_skip(pagination)
+    ).limit(
+        pagination.page_size
+    ).to_list(length=pagination.page_size)
+
+    serialized_bundles = [
+        await serialize_bundle(bundle)
+        for bundle in bundles
+    ]
+
+    return build_paginated_response(
+        items=serialized_bundles,
+        total=total,
+        params=pagination,
+    )
 
 
 async def get_bundle_by_id(bundle_id: str):
