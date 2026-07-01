@@ -9,6 +9,8 @@ from app.db.collections import get_user_collection
 from app.exceptions.user import UserNotFoundError, InvalidUserIdError, UserEmailAlreadyExistsError
 from app.schemas.user import UserRegister, UserUpdate, UserRole
 
+from app.utils.pagination import PaginationParams, build_paginated_response, get_skip
+
 
 logger = logging.getLogger(__name__)
 
@@ -103,12 +105,29 @@ async def authenticate_user(email: str, password: str):
     return user
 
 
-async def get_users():
+async def get_users(pagination: PaginationParams):
     user_collection = get_user_collection()
 
-    users = await user_collection.find().to_list(length=100)
+    query = {}
 
-    return [serialize_user(user) for user in users]
+    total = await user_collection.count_documents(query)
+
+    users = await user_collection.find(query).skip(
+        get_skip(pagination)
+    ).limit(
+        pagination.page_size
+    ).to_list(length=pagination.page_size)
+
+    serialized_users = [
+        serialize_user(user)
+        for user in users
+    ]
+
+    return build_paginated_response(
+        items=serialized_users,
+        total=total,
+        params=pagination,
+    )
 
 
 async def update_user(user_id: str, user: UserUpdate):

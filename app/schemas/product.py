@@ -85,3 +85,19 @@ class ProductManagerResponse(ProductUserResponse):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+
+
+class PaginatedProductUserResponse(BaseModel):
+    items: list[ProductUserResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
+class PaginatedProductManagerResponse(BaseModel):
+    items: list[ProductManagerResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int

@@ -5,23 +5,46 @@ from app.dependencies.auth import require_manager
 from app.schemas.parser import ImportCategoryRequest, ImportCustomBooksRequest
 from app.services.parser.books_to_scrape_service import get_available_categories, get_book_details, get_books_from_category, get_full_books_from_category
 
+from app.utils.pagination import PaginationParams, build_paginated_response
+
 
 router = APIRouter(prefix="/parser", tags=["Parser"])
 
 
 @router.get("/categories", dependencies=[Depends(require_manager)])
-async def get_categories_endpoint():
-    return await get_available_categories()
+async def get_categories_endpoint(
+    pagination: PaginationParams = Depends(),
+):
+    categories = await get_available_categories()
+
+    start = (pagination.page - 1) * pagination.page_size
+    end = start + pagination.page_size
+
+    return build_paginated_response(
+        items=categories[start:end],
+        total=len(categories),
+        params=pagination,
+    )
 
 
 @router.get("/category/books", dependencies=[Depends(require_manager)])
 async def get_books_from_category_endpoint(
-    category_url: str, 
-    limit: int | None = None
+    category_url: str,
+    limit: int | None = None,
+    pagination: PaginationParams = Depends(),
 ):
-    return await get_books_from_category(
+    books = await get_books_from_category(
         category_url=category_url,
         limit=limit,
+    )
+
+    start = (pagination.page - 1) * pagination.page_size
+    end = start + pagination.page_size
+
+    return build_paginated_response(
+        items=books[start:end],
+        total=len(books),
+        params=pagination,
     )
 
 
@@ -34,10 +57,20 @@ async def get_book_details_endpoint(book_url: str):
 async def get_full_books_from_category_endpoint(
     category_url: str,
     limit: int | None = None,
+    pagination: PaginationParams = Depends(),
 ):
-    return await get_full_books_from_category(
+    books = await get_full_books_from_category(
         category_url=category_url,
         limit=limit,
+    )
+
+    start = (pagination.page - 1) * pagination.page_size
+    end = start + pagination.page_size
+
+    return build_paginated_response(
+        items=books[start:end],
+        total=len(books),
+        params=pagination,
     )
 
 

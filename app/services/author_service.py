@@ -8,6 +8,8 @@ from app.db.collections import get_author_collection
 from app.exceptions.author import AuthorNotFoundError, InvalidAuthorIdError
 from app.schemas.author import AuthorCreate, AuthorUpdate
 
+from app.utils.pagination import PaginationParams, build_paginated_response, get_skip
+
 
 logger = logging.getLogger(__name__)
 
@@ -62,22 +64,54 @@ async def create_author(author: AuthorCreate):
     return serialize_author(created_author)
 
 
-async def get_active_authors():
+async def get_active_authors(pagination: PaginationParams):
     author_collection = get_author_collection()
 
-    authors = await author_collection.find(
-        {"is_active": True}
-    ).to_list(length=100)
+    query = {"is_active": True}
 
-    return [serialize_author(author) for author in authors]
+    total = await author_collection.count_documents(query)
+
+    authors = await author_collection.find(query).skip(
+        get_skip(pagination)
+    ).limit(
+        pagination.page_size
+    ).to_list(length=pagination.page_size)
+
+    serialized_authors = [
+        serialize_author(author)
+        for author in authors
+    ]
+
+    return build_paginated_response(
+        items=serialized_authors,
+        total=total,
+        params=pagination,
+    )
 
 
-async def get_authors():
+async def get_authors(pagination: PaginationParams):
     author_collection = get_author_collection()
 
-    authors = await author_collection.find().to_list(length=100)
+    query = {}
 
-    return [serialize_author(author) for author in authors]
+    total = await author_collection.count_documents(query)
+
+    authors = await author_collection.find(query).skip(
+        get_skip(pagination)
+    ).limit(
+        pagination.page_size
+    ).to_list(length=pagination.page_size)
+
+    serialized_authors = [
+        serialize_author(author)
+        for author in authors
+    ]
+
+    return build_paginated_response(
+        items=serialized_authors,
+        total=total,
+        params=pagination,
+    )
 
 
 async def get_author_by_id(author_id: str):

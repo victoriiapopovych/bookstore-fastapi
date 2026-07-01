@@ -9,6 +9,8 @@ from app.exceptions.product import ProductNotFoundError, InvalidProductIdError, 
 from app.schemas.product import ProductCreate, ProductUpdate, ProductType
 from app.services.discount_calculation_service import calculate_product_price
 
+from app.utils.pagination import PaginationParams, build_paginated_response, get_skip
+
 logger = logging.getLogger(__name__)
 
 
@@ -175,22 +177,54 @@ async def create_product(product: ProductCreate):
     return await serialize_product(created_product)
 
 
-async def get_active_products():
+async def get_active_products(pagination: PaginationParams):
     product_collection = get_product_collection()
 
-    products = await product_collection.find(
-        {"is_active": True}
-    ).to_list(length=100)
+    query = {"is_active": True}
 
-    return [await serialize_product(product) for product in products]
+    total = await product_collection.count_documents(query)
+
+    products = await product_collection.find(query).skip(
+        get_skip(pagination)
+    ).limit(
+        pagination.page_size
+    ).to_list(length=pagination.page_size)
+
+    serialized_products = [
+        await serialize_product(product)
+        for product in products
+    ]
+
+    return build_paginated_response(
+        items=serialized_products,
+        total=total,
+        params=pagination,
+    )
 
 
-async def get_products():
+async def get_products(pagination: PaginationParams):
     product_collection = get_product_collection()
 
-    products = await product_collection.find().to_list(length=100)
+    query = {}
 
-    return [await serialize_product(product) for product in products]
+    total = await product_collection.count_documents(query)
+
+    products = await product_collection.find(query).skip(
+        get_skip(pagination)
+    ).limit(
+        pagination.page_size
+    ).to_list(length=pagination.page_size)
+
+    serialized_products = [
+        await serialize_product(product)
+        for product in products
+    ]
+
+    return build_paginated_response(
+        items=serialized_products,
+        total=total,
+        params=pagination,
+    )
 
 
 async def get_product_by_id(product_id: str):

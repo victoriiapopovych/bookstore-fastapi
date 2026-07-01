@@ -47,3 +47,19 @@ class BundleManagerResponse(BundleUserResponse):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+
+
+class PaginatedBundleUserResponse(BaseModel):
+    items: list[BundleUserResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
+class PaginatedBundleManagerResponse(BaseModel):
+    items: list[BundleManagerResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int

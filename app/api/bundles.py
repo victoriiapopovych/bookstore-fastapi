@@ -2,8 +2,10 @@ from fastapi import APIRouter, Depends, status
 
 from app.dependencies.auth import require_manager
 from app.exceptions.bundle import BundleNotFoundError
-from app.schemas.bundle import BundleCreate, BundleUpdate, BundleUserResponse, BundleManagerResponse
+from app.schemas.bundle import BundleCreate, BundleUpdate, BundleUserResponse, BundleManagerResponse, PaginatedBundleManagerResponse, PaginatedBundleUserResponse
 from app.services.bundle_service import create_bundle, get_bundles, get_active_bundles, get_bundle_by_id, update_bundle, delete_bundle
+
+from app.utils.pagination import PaginationParams
 
 
 router = APIRouter(prefix="/bundles", tags=["Bundles"])
@@ -17,16 +19,19 @@ async def create_bundle_endpoint(
     return await create_bundle(bundle)
 
 
-@router.get("/", response_model=list[BundleUserResponse])
-async def get_active_bundles_endpoint():
-    return await get_active_bundles()
+@router.get("/", response_model=PaginatedBundleUserResponse)
+async def get_active_bundles_endpoint(
+    pagination: PaginationParams = Depends(),
+):
+    return await get_active_bundles(pagination)
 
 
-@router.get("/manager", response_model=list[BundleManagerResponse])
+@router.get("/manager", response_model=PaginatedBundleManagerResponse)
 async def get_bundles_manager_endpoint(
+    pagination: PaginationParams = Depends(),
     current_user: dict = Depends(require_manager),
 ):
-    return await get_bundles()
+    return await get_bundles(pagination)
 
 
 @router.get("/manager/{bundle_id}", response_model=BundleManagerResponse)

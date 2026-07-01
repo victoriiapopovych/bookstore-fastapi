@@ -5,6 +5,8 @@ from urllib.parse import urljoin
 import httpx
 from bs4 import BeautifulSoup
 
+from app.exceptions.parser import ExternalPageNotFoundError, ExternalSiteUnavailableError, InvalidParserUrlError, NoBooksFoundError
+
 
 logger = logging.getLogger(__name__)
 
@@ -20,12 +22,23 @@ RATING_MAP = {
 
 
 async def fetch_page(url: str) -> str:
-    logger.info("Fetching page: %s", url)
+    if not url.startswith(BASE_URL):
+        raise InvalidParserUrlError
 
-    async with httpx.AsyncClient(timeout=10) as client:
-        response = await client.get(url)
-        response.raise_for_status()
-        return response.text
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            return response.text
+
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 404:
+            raise ExternalPageNotFoundError from exc
+
+        raise ExternalSiteUnavailableError from exc
+
+    except httpx.RequestError as exc:
+        raise ExternalSiteUnavailableError from exc
 
 
 def parse_price(price_text: str) -> float:
@@ -36,9 +49,7 @@ def parse_rating(element) -> int | None:
     if not element:
         return None
 
-    classes = element.get("class", [])
-
-    for class_name in classes:
+    for class_name in element.get("class", []):
         if class_name in RATING_MAP:
             return RATING_MAP[class_name]
 
@@ -47,26 +58,20 @@ def parse_rating(element) -> int | None:
 
 def parse_stock_quantity(stock_text: str) -> int:
     match = re.search(r"\d+", stock_text)
-
-    if not match:
-        return 0
-
-    return int(match.group())
+    return int(match.group()) if match else 0
 
 
 async def get_available_categories():
     html = await fetch_page(BASE_URL)
     soup = BeautifulSoup(html, "html.parser")
 
-    category_links = soup.select(".side_categories ul li ul li a")
-
     categories = []
 
-    for link in category_links:
+    for link in soup.select(".side_categories ul li ul li a"):
         name = link.text.strip()
         href = link.get("href")
 
-        if not href:
+        if not name or not href:
             continue
 
         categories.append(
@@ -76,8 +81,10 @@ async def get_available_categories():
             }
         )
 
-    logger.info("Parsed categories: %s", len(categories))
+    if not categories:
+        raise NoBooksFoundError
 
+    logger.info("Parsed categories: %s", len(categories))
     return categories
 
 
@@ -88,13 +95,13 @@ async def get_books_from_category(
     html = await fetch_page(category_url)
     soup = BeautifulSoup(html, "html.parser")
 
-    book_cards = soup.select("article.product_pod")
     books = []
 
-    for book_card in book_cards:
+    for book_card in soup.select("article.product_pod"):
         title_element = book_card.select_one("h3 a")
         price_element = book_card.select_one(".price_color")
         image_element = book_card.select_one(".image_container img")
+        rating_element = book_card.select_one("p.star-rating")
 
         if not title_element or not price_element:
             continue
@@ -110,7 +117,7 @@ async def get_books_from_category(
             {
                 "name": title_element.get("title"),
                 "price": parse_price(price_element.text),
-                "rating": parse_rating(book_card.select_one("p.star-rating")),
+                "rating": parse_rating(rating_element),
                 "url": book_url,
                 "image_url": image_url,
             }
@@ -118,6 +125,9 @@ async def get_books_from_category(
 
         if limit and len(books) >= limit:
             break
+
+    if not books:
+        raise NoBooksFoundError
 
     logger.info(
         "Parsed books from category: url=%s, count=%s",
@@ -152,8 +162,10 @@ async def get_book_details(book_url: str):
         ),
     }
 
-    logger.info("Parsed book details: url=%s, upc=%s", book_url, details["upc"])
+    if not details["upc"]:
+        raise ExternalPageNotFoundError
 
+    logger.info("Parsed book details: url=%s, upc=%s", book_url, details["upc"])
     return details
 
 
@@ -161,7 +173,10 @@ async def get_full_books_from_category(
     category_url: str,
     limit: int | None = None,
 ):
-    books = await get_books_from_category(category_url, limit)
+    books = await get_books_from_category(
+        category_url=category_url,
+        limit=limit,
+    )
 
     full_books = []
 
@@ -187,13 +202,24 @@ async def get_full_book_by_url(book_url: str):
     image_element = soup.select_one(".item.active img")
     rating_element = soup.select_one(".product_main p.star-rating")
 
+    if not title_element or not price_element:
+        raise ExternalPageNotFoundError
+
     details = await get_book_details(book_url)
 
-    return {
-        "name": title_element.text.strip() if title_element else "Unknown title",
-        "price": parse_price(price_element.text) if price_element else 0,
-        "rating": parse_rating(rating_element) if rating_element else None,
+    book = {
+        "name": title_element.text.strip(),
+        "price": parse_price(price_element.text),
+        "rating": parse_rating(rating_element),
         "url": book_url,
-        "image_url": urljoin(book_url, image_element.get("src")) if image_element else None,
+        "image_url": (
+            urljoin(book_url, image_element.get("src"))
+            if image_element
+            else None
+        ),
         **details,
     }
+
+    logger.info("Parsed full book: url=%s, upc=%s", book_url, book["upc"])
+
+    return book

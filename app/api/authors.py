@@ -2,8 +2,10 @@ from fastapi import APIRouter, Depends, status
 
 from app.dependencies.auth import require_manager
 from app.exceptions.author import AuthorNotFoundError
-from app.schemas.author import AuthorCreate, AuthorUpdate, AuthorUserResponse, AuthorManagerResponse
+from app.schemas.author import AuthorCreate, AuthorUpdate, AuthorUserResponse, AuthorManagerResponse, PaginatedAuthorManagerResponse, PaginatedAuthorUserResponse
 from app.services.author_service import create_author, get_authors, get_active_authors, get_author_by_id, update_author, delete_author
+
+from app.utils.pagination import PaginationParams
 
 
 router = APIRouter(prefix="/authors", tags=["Authors"])
@@ -17,16 +19,19 @@ async def create_author_endpoint(
     return await create_author(author)
 
 
-@router.get("/", response_model=list[AuthorUserResponse])
-async def get_active_authors_endpoint():
-    return await get_active_authors()
+@router.get("/", response_model=PaginatedAuthorUserResponse)
+async def get_active_authors_endpoint(
+    pagination: PaginationParams = Depends(),
+):
+    return await get_active_authors(pagination)
 
 
-@router.get("/manager", response_model=list[AuthorManagerResponse])
+@router.get("/manager", response_model=PaginatedAuthorManagerResponse)
 async def get_authors_manager_endpoint(
+    pagination: PaginationParams = Depends(),
     current_user: dict = Depends(require_manager),
 ):
-    return await get_authors()
+    return await get_authors(pagination)
 
 
 @router.get("/manager/{author_id}", response_model=AuthorManagerResponse)

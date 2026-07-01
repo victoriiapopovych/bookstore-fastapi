@@ -2,8 +2,10 @@ from fastapi import APIRouter, Depends
 
 from app.dependencies.auth import get_current_user, require_manager
 from app.exceptions.user import CannotDeactivateSelfError
-from app.schemas.user import UserSelfResponse, UserManagerResponse, UserUpdate
+from app.schemas.user import UserSelfResponse, UserManagerResponse, UserUpdate, PaginatedUserManagerResponse
 from app.services.user_service import serialize_user, get_users, get_user_by_id, update_user, deactivate_user
+
+from app.utils.pagination import PaginationParams
 
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -22,9 +24,11 @@ async def update_my_profile_endpoint(user: UserUpdate, current_user=Depends(get_
     )
 
 
-@router.get("/manager", response_model=list[UserManagerResponse], dependencies=[Depends(require_manager)],)
-async def get_users_endpoint():
-    return await get_users()
+@router.get("/manager", response_model=PaginatedUserManagerResponse, dependencies=[Depends(require_manager)])
+async def get_users_endpoint(
+    pagination: PaginationParams = Depends(),
+):
+    return await get_users(pagination)
 
 
 @router.get("/manager/{user_id}", response_model=UserManagerResponse, dependencies=[Depends(require_manager)],)

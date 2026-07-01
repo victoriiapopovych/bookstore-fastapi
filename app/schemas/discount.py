@@ -73,3 +73,19 @@ class DiscountManagerResponse(DiscountUserResponse):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+
+
+class PaginatedDiscountUserResponse(BaseModel):
+    items: list[DiscountUserResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
+class PaginatedDiscountManagerResponse(BaseModel):
+    items: list[DiscountManagerResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int

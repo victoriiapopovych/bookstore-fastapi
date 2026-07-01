@@ -8,6 +8,8 @@ from app.db.collections import get_category_collection
 from app.exceptions.category import CategoryNotFoundError, InvalidCategoryIdError, InvalidParentCategoryError, CategorySlugAlreadyExistsError
 from app.schemas.category import CategoryCreate, CategoryUpdate
 
+from app.utils.pagination import PaginationParams, build_paginated_response, get_skip
+
 
 logger = logging.getLogger(__name__)
 
@@ -90,22 +92,54 @@ async def create_category(category: CategoryCreate):
     return serialize_category(created_category)
 
 
-async def get_active_categories():
+async def get_active_categories(pagination: PaginationParams):
     category_collection = get_category_collection()
 
-    categories = await category_collection.find(
-        {"is_active": True}
-    ).to_list(length=100)
+    query = {"is_active": True}
 
-    return [serialize_category(category) for category in categories]
+    total = await category_collection.count_documents(query)
+
+    categories = await category_collection.find(query).skip(
+        get_skip(pagination)
+    ).limit(
+        pagination.page_size
+    ).to_list(length=pagination.page_size)
+
+    serialized_categories = [
+        serialize_category(category)
+        for category in categories
+    ]
+
+    return build_paginated_response(
+        items=serialized_categories,
+        total=total,
+        params=pagination,
+    )
 
 
-async def get_categories():
+async def get_categories(pagination: PaginationParams):
     category_collection = get_category_collection()
 
-    categories = await category_collection.find().to_list(length=100)
+    query = {}
 
-    return [serialize_category(category) for category in categories]
+    total = await category_collection.count_documents(query)
+
+    categories = await category_collection.find(query).skip(
+        get_skip(pagination)
+    ).limit(
+        pagination.page_size
+    ).to_list(length=pagination.page_size)
+
+    serialized_categories = [
+        serialize_category(category)
+        for category in categories
+    ]
+
+    return build_paginated_response(
+        items=serialized_categories,
+        total=total,
+        params=pagination,
+    )
 
 
 async def get_category_by_id(category_id: str):
